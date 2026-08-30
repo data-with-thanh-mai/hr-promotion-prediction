@@ -1,0 +1,17 @@
+# YEU CAU: Python > 3.10
+
+
+fastapi>=0.100.0
+uvicorn>=0.22.0
+pydantic>=2.0.0
+
+numpy==2.1.0
+pandas==2.3.3
+scipy==1.18.1
+
+scikit-learn==1.6.1
+category_encoders==2.8.1
+lightgbm==4.6.0
+
+
+joblib==1.5.3
