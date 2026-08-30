@@ -81,8 +81,8 @@ Formal benchmarking used two model groups with 5-fold cross-validation:
 
 **Ensemble** (bagging + boosting): Random Forest, Extra Trees, AdaBoost, XGBoost, LightGBM, CatBoost
 
-<img width="570" height="167" alt="ensemble results" src="https://github.com/user-attachments/assets/5951f2af-2e67-46be-9790-3b70f515f725" />
-<img width="573" height="164" alt="traditional results" src="https://github.com/user-attachments/assets/407c3db2-accd-43f3-bcdd-70e3f6dc63bd" />
+<img width="250" height="167" alt="ensemble results" src="https://github.com/user-attachments/assets/5951f2af-2e67-46be-9790-3b70f515f725" />
+<img width="250" height="164" alt="traditional results" src="https://github.com/user-attachments/assets/407c3db2-accd-43f3-bcdd-70e3f6dc63bd" />
 
 **Results:** the boosting models (LightGBM, CatBoost, XGBoost) led on PR-AUC, but only slightly ahead of SVM — not every ensemble model outperformed the traditional ones. Two clear tendencies emerged:
 
