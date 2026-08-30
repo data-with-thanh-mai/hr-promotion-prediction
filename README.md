@@ -53,10 +53,6 @@ The dataset contains 54,808 samples and 13 features, encompassing past/current p
 - Dropped `employee_id` (no predictive value).
 - Dropped `gender` and `age`. A chi-square test confirmed `gender` has no statistically significant association with `is_promoted` (p = 0.090). Removing these demographic features reduces noise and ensures the model bases promotion recommendations strictly on merit and performance, mitigating age and gender bias.
 
-  > Note: removing these raw features reduces but does not fully eliminate bias risk — proxy correlations through `region` or `department` were not tested in this iteration.
-
-  <img width="567" height="334" alt="chi-square test results" src="https://github.com/user-attachments/assets/36a7a717-3f24-47a4-bd49-c42f542d8261" />
-
 - **Categorical encoding:** applied ordinal encoding for `education`, as higher education levels historically correlate with higher promotion readiness.
 - **Feature engineering:** created two new features:
   - `relative_training_score`: ratio of the employee's score to the average score of their department.
