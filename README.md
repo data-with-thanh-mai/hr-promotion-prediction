@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # HR Promotion Prediction API
 
 ## 1. Interactive API Demo
@@ -227,4 +228,4 @@ An interactive version is available at `/docs` (Swagger UI) or the HTML demo at 
 - Add authentication to the API before any production use, since it handles employee performance data.
 - Build a lightweight internal dashboard (e.g. Streamlit) for HR to review predictions in bulk, rather than one employee at a time via the API form.
 - Add a feedback loop: track actual promotion outcomes vs. predictions to periodically retrain and validate the model.
-# hr-promotion
+
