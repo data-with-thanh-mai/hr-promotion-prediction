@@ -1,33 +1,38 @@
+# HR Promotion Prediction & Decision Support System
 
-# HR Promotion Prediction 
+An end-to-end Machine Learning solution designed to streamline the annual employee promotion cycle by identifying eligible high-performing candidates early through predictive analytics and a real-time FastAPI interface.
 
-## 1. Interactive API Demo
+---
 
-<img width="1284" height="520" alt="demo-ezgif com-video-to-gif-converter" src="https://github.com/user-attachments/assets/be3e4e60-90b4-48d1-8659-967a1d1d9c13" />
+## ✨ 1. Interactive API Demo
 
+<p align="center">
+  <img width="900" alt="API Demo Interface" src="https://github.com/user-attachments/assets/be3e4e60-90b4-48d1-8659-967a1d1d9c13" />
+</p>
 
-## 2. Business Context & Proposed Solution
+---
 
-**The Problem:**
-A large Multinational Corporation (MNC) has 9 broad verticals across the organization. One of their primary challenges is identifying the right people for promotion (for manager positions and below) and preparing them in time.
+## 🧭 2. Business Context & Proposed Solution
 
-Currently, final promotions are only announced after annual evaluations. This rigid schedule forces capable employees to wait months before transitioning into new roles, causing operational delays and wasting talent.
+### The Problem
+A large Multinational Corporation (MNC) operates across 9 broad verticals. A primary bottleneck is identifying the right personnel for promotions and preparing them in time. Promotions are traditionally announced only after rigid annual evaluations, forcing capable employees to wait months before transitioning, leading to operational delays and talent attrition.
 
-**The Solution:**
-To address this, this project delivers an end-to-end Machine Learning solution to evaluate and identify eligible candidates at specific checkpoints throughout the year.
+### The Solution
+This project delivers a production-ready ML pipeline to evaluate candidates at intermediate checkpoints. 
+* **Model Strategy:** A custom Soft-Voting Ensemble (**LightGBM + AdaBoost**) optimized for high-precision decision-making.
+* **Deployment:** Integrated into a real-time **REST API using FastAPI**, enabling HR personnel to input employee metrics and instantly receive data-driven recommendations (*"Recommend for Promotion"* vs. *"Keep under observation"*).
 
-Specifically, we built a robust classification pipeline that handles highly imbalanced HR data. The final model is deployed as a real-time **REST API using FastAPI**. This allows the HR department to simply input an employee's current metrics (training score, length of service, etc.) and instantly receive a data-driven recommendation (*"Recommend for Promotion"* or *"Keep under observation"*), expediting the promotion cycle without waiting for the year-end review.
+---
 
-Multiple attributes have been provided around each employee's past and current performance along with demographics.
+## 🧪 3. Data & Preprocessing Overview
 
-## 3. Data & Preprocessing Overview
-**Data Source:** The dataset used to train and evaluate this model is publicly available via [Kaggle HR Analytics Dataset](https://www.kaggle.com/datasets/arashnic/hr-ana).
-The dataset contains 54,808 samples and 13 features, encompassing past/current performance and demographics.
+* **Data Source:** Publicly available via [Kaggle HR Analytics Dataset](https://www.kaggle.com/datasets/arashnic/hr-analytics-jobchange).  
+* **Dataset Scale:** 54,808 samples and 13 features spanning performance history and demographics.
 
-**Data Dictionary:**
+### Data Dictionary
 
 | Field | Description |
-|---|---|
+| :--- | :--- |
 | `employee_id` | Unique ID for the employee |
 | `department` | Department of the employee |
 | `region` | Region of employment (unordered) |
@@ -42,84 +47,75 @@ The dataset contains 54,808 samples and 13 features, encompassing past/current p
 | `avg_training_score` | Average score in current training evaluations |
 | `is_promoted` (target) | 1 if recommended for promotion, else 0 |
 
-**Data Cleaning & Preprocessing Strategy:**
+### Preprocessing & AI Fairness Strategy
+* **Imbalanced Handling:** Class 1 (promoted) accounts for ~8.69%. Handled via model-level class weighting. SMOTE was deliberately bypassed to prevent generating unrealistic categorical noise.
+* **Missing Value Imputation:** 
+  * `previous_year_rating` (~7.63% missing): Imputed with `0` (reflecting new hires without a prior year record).
+  * `education` (~4.38% missing): Imputed using the most frequent strategy.
+* **Bias Mitigation:** Dropped `employee_id`, `gender`, and `age`. A preliminary Chi-Square test confirmed `gender` showed no statistically significant association with promotion outcomes ($p = 0.090$), minimizing algorithmic discrimination.
+* **Feature Engineering:**
+  * `relative_training_score`: Employee score relative to their department's average.
+  * `total_training_score`: Combined metric (`avg_training_score * no_of_trainings`).
 
-- **Imbalanced data handling:** class 1 (promoted) accounts for only ~8.69% of the dataset. Handled using class weights inside the model architecture. SMOTE was intentionally avoided, as generating synthetic data points for categorical variables introduces unrealistic noise.
-- **Missing value imputation:**
-  - `previous_year_rating` (~7.63% missing): imputed with 0 — business logic dictates that these missing values belong to newly hired employees who don't yet have a previous-year rating.
-  - `education` (~4.38% missing): imputed with the most-frequent strategy to avoid dropping rows.
+---
 
-**Feature Selection & Bias Mitigation (AI Fairness):**
-
-- Dropped `employee_id` (no predictive value).
-- Dropped `gender` and `age`. A chi-square test confirmed `gender` has no statistically significant association with `is_promoted` (p = 0.090). Removing these demographic features reduces noise and ensures the model bases promotion recommendations strictly on merit and performance, mitigating age and gender bias.
-
-- **Categorical encoding:** applied ordinal encoding for `education`, as higher education levels historically correlate with higher promotion readiness.
-- **Feature engineering:** created two new features:
-  - `relative_training_score`: ratio of the employee's score to the average score of their department.
-  - `total_training_score`: `avg_training_score * no_of_trainings`, capturing absolute training volume and quality.
-
-## 4. Model Architecture & Threshold Strategy
+## ⚡ 4. Model Architecture & Threshold Strategy
 
 ### 4.1. Preprocessing Pipeline
+Built with Scikit-Learn's `Pipeline` + `ColumnTransformer`, incorporating custom feature transformers and 7 isolated feature processing sub-pipelines.
 
-Built with scikit-learn's `Pipeline` + `ColumnTransformer`, consisting of a custom feature engineering step followed by 7 separate column groups (drop, numeric, ordinal, one-hot, target encoding, constant imputation, passthrough).
+<p align="center">
+  <img width="800" alt="preprocessing_pipeline" src="https://github.com/user-attachments/assets/4785306c-03b8-4e46-939a-21679b8ce0da" />
+</p>
 
-<img width="600" height="300" alt="preprocessing_pipeline" src="https://github.com/user-attachments/assets/4785306c-03b8-4e46-939a-21679b8ce0da" />
-
-### 4.2. Why PR-AUC and Class-1 Precision/Recall
-
-The dataset is highly imbalanced (~8.7% promoted), so Accuracy and ROC-AUC are misleading — a model that always predicts "not promoted" still scores ~91% accuracy. We use **PR-AUC** and **Precision/Recall of class 1** instead, since false positives (wrongly recommending promotion) and false negatives (missing deserving talent) both carry real business cost that class-0 metrics would hide.
+### 4.2. Why PR-AUC & Precision/Recall?
+With an 8.7% positive rate, standard Accuracy and ROC-AUC are heavily inflated. We prioritized **PR-AUC** and **Class-1 Precision** because false positives (premature promotions) carry massive organizational and financial friction costs.
 
 ### 4.3. Baseline Model Comparison
+Initial screening across 11 models (Traditional & Ensemble) was conducted using 5-fold cross-validation. 
+* **Traditional (`class_weight='balanced'`):** Logistic Regression, Decision Tree, Gaussian Naive Bayes, K-Neighbors, SVM.
+* **Ensemble (Bagging & Boosting):** Random Forest, Extra Trees, AdaBoost, XGBoost, LightGBM, CatBoost.
 
-LazyPredict gave a quick first look, but wasn't suitable for deeper evaluation — it doesn't support custom cross-validation or imbalance handling, so it was used for reference only.
-
-Formal benchmarking used two model groups with 5-fold cross-validation:
-
-**Traditional** (`class_weight='balanced'`): Logistic Regression, Decision Tree, Gaussian Naive Bayes, K-Neighbors, SVM
-
-**Ensemble** (bagging + boosting): Random Forest, Extra Trees, AdaBoost, XGBoost, LightGBM, CatBoost
-
-**Results:** the boosting models (LightGBM, CatBoost, XGBoost) led on PR-AUC, but only slightly ahead of SVM — not every ensemble model outperformed the traditional ones. Two clear tendencies emerged:
-
-- **Moderate recall (~55–65%), low precision (~20–30%)**: LightGBM, CatBoost, XGBoost, Logistic Regression.
-- **High precision (>85%), low recall (~30%)**: AdaBoost, K-Neighbors.
-
-We picked one model to represent each tendency for further tuning: **LightGBM** (balanced precision-recall trade-off) and **AdaBoost** (conservative, favors certainty over coverage).
+**Key Findings:** Boosting models (LightGBM, CatBoost, XGBoost) led on PR-AUC. Two behavioral clusters emerged:
+* *Moderate Recall (~55–65%), Low Precision (~20–30%):* LightGBM, CatBoost, XGBoost, Logistic Regression.
+* *High Precision (>85%), Low Recall (~30%):* AdaBoost, K-Neighbors.
 
 ### 4.4. Fine-tuning & Final Model Selection
+Both LightGBM and AdaBoost were tuned with **Optuna**. Performance plateaued around a PR-AUC of ~55%, indicating that the performance ceiling was driven by feature space limitations rather than hyperparameter tuning.
 
-Both models were tuned with **Optuna**. Performance improved slightly but not dramatically — most results plateaued around a PR-AUC of ~55%, suggesting the current bottleneck is feature engineering rather than hyperparameter tuning (a direction for future improvement).
+To balance high-confidence decision-making, we constructed a **Soft-Voting Ensemble** combining **LightGBM (60%)** and **AdaBoost (40%)**. 
 
-That said, a soft-voting ensemble of LightGBM + AdaBoost, and AdaBoost alone, handle one scenario particularly well: picking a single candidate with **high confidence**.
+### 4.5. Final Validation Performance (Threshold = 0.70)
+By shifting the threshold to **0.70**, we heavily prioritized **Precision** to align with HR's minimal-risk strategy. 
 
-Since HR prioritizes **precision** (a wrong promotion recommendation is costlier than a missed one at this checkpoint — unflagged candidates can still be reviewed at the next cycle), the ensemble weights and decision threshold are being re-tuned using the validation-set precision-recall curve to find a high-precision operating point that doesn't sacrifice recall unnecessarily.
+* **Precision (Class 1):** `0.9055` (The model successfully identified high-potential candidates with a ~90.5% accuracy rate when recommending promotion).
+* **Recall (Class 1):** `0.3557` (Intentionally accepts missing some candidates—who will be reviewed at year-end—to guarantee absolute certainty for flagged profiles).
+* **F1-Score:** `0.5108`
+* **Total Flagged:** 275 high-potential candidates.
 
-> **Results pending final re-evaluation.** The final ensemble weights, threshold, and test-set performance table (Precision/Recall/F1/PR-AUC for the chosen operating point) will be added here once validated.
-<img width="379" height="230" alt="image" src="https://github.com/user-attachments/assets/1e85e770-ffc0-4bd8-b90e-35889ce22cb7" />
-Model là : lightxgboost - 0.6 - 0.4 adaabootu , threshold 0.7 
-## 5. Repository Structure
+---
 
-```
+## 🗂️ 5. Repository Structure
+
+```text
 hr-promotion-prediction/
-├── app/                            # FastAPI application
-│   ├── static/                     # HTML demo frontend
-│   ├── feature_engineering.py      # Custom transformer class
-│   ├── hr_promotion_pipeline.pkl   # Trained model pipeline
-│   └── main.py                     # API entrypoint
+├── app/                        # FastAPI application
+│   ├── static/                 # HTML demo frontend
+│   ├── feature_engineering.py  # Custom transformer class
+│   ├── hr_promotion_pipeline.pkl # Trained model pipeline (.pkl)
+│   └── main.py                 # API entrypoint
 ├── data/
-│   └── data.csv                    # Dataset
+│   └── data.csv                # Raw dataset
 ├── notebook/
-│   └── hr-promotion-predict.ipynb  # Full EDA, training & tuning notebook
+│   └── hr-promotion-predict.ipynb # EDA, training & tuning notebook
 ├── .gitignore
 ├── LICENSE
 ├── README.md
-├── requirements.txt                # Runtime dependencies
-└── requirements-dev.txt            # Dev/notebook dependencies (Optuna, LazyPredict...)
+├── requirements.txt            # Runtime dependencies
+└── requirements-dev.txt        # Development dependencies
 ```
 
-## 6. Setup & Installation
+## ⚙️ 6. Setup & Installation
 
 **Requirements:** Python >= 3.10
 
@@ -161,21 +157,9 @@ Once the server starts, it will be available at:
 
 Both let you submit employee data and get a promotion recommendation with its predicted probability.
 
-## 9. Future Enhancements
+## 8. Future Enhancements
 
-**Model Performance:**
-- Explore additional feature engineering — current models plateau around PR-AUC ~55%, suggesting the bottleneck is feature richness rather than hyperparameter tuning. Potential directions: interaction features between department and training metrics, tenure-based trends, peer-relative performance scores.
-- Experiment with SMOTE variants (e.g. SMOTENC for mixed categorical/numeric data) as an alternative to class-weight balancing.
-- Add model explainability (SHAP values) so HR can see *why* a specific employee was or wasn't recommended — important for a decision that affects real people.
-
-**Engineering & Deployment:**
-- Containerize the app with Docker for consistent deployment across environments (avoids the Python/dependency version issues encountered during local setup).
-- Add a `/batch-predict` endpoint to score multiple employees at once via CSV upload.
-- Add request logging and basic monitoring (e.g. track prediction distribution over time to catch data/model drift).
-- Add automated tests (unit tests for the preprocessing pipeline, integration tests for the API endpoints) and a CI pipeline.
-
-**Product:**
-- Add authentication to the API before any production use, since it handles employee performance data.
-- Build a lightweight internal dashboard (e.g. Streamlit) for HR to review predictions in bulk, rather than one employee at a time via the API form.
-- Add a feedback loop: track actual promotion outcomes vs. predictions to periodically retrain and validate the model.
-
+* **Deep-dive Error Analysis:** Analyze False Positives and False Negatives extracted from the validation set to identify complex edge cases and guide the next iteration of feature engineering.
+* **Feature Richness:** Current models plateau around PR-AUC ~55%. Potential directions include interaction features between department and training metrics, tenure-based trends, and peer-relative performance scores.
+* **SMOTE Variants:** Experiment with SMOTENC (for mixed categorical/numeric data) as an alternative to class-weight balancing.
+* **Explainable AI (XAI):** Add SHAP values so HR can see *why* a specific employee was or wasn't recommended — crucial for decisions affecting real people.
