@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # HR Promotion Prediction API
 
 ## 1. Interactive API Demo
@@ -104,7 +104,8 @@ That said, a soft-voting ensemble of LightGBM + AdaBoost, and AdaBoost alone, ha
 Since HR prioritizes **precision** (a wrong promotion recommendation is costlier than a missed one at this checkpoint — unflagged candidates can still be reviewed at the next cycle), the ensemble weights and decision threshold are being re-tuned using the validation-set precision-recall curve to find a high-precision operating point that doesn't sacrifice recall unnecessarily.
 
 > **Results pending final re-evaluation.** The final ensemble weights, threshold, and test-set performance table (Precision/Recall/F1/PR-AUC for the chosen operating point) will be added here once validated.
-
+<img width="379" height="230" alt="image" src="https://github.com/user-attachments/assets/1e85e770-ffc0-4bd8-b90e-35889ce22cb7" />
+Model là : lightxgboost - 0.6 - 0.4 adaabootu , threshold 0.7 
 ## 5. Repository Structure
 
 ```
@@ -166,47 +167,6 @@ Once the server starts, it will be available at:
 - **Swagger UI (API docs & testing):** http://127.0.0.1:8000/docs
 
 Both let you submit employee data and get a promotion recommendation with its predicted probability.
-
-## 8. API Usage & Examples
-
-**Endpoint:** `POST /predict`
-
-**Example request (curl):**
-
-```bash
-curl -X POST http://127.0.0.1:8000/predict \
-  -H "Content-Type: application/json" \
-  -d '{
-    "employee_id": 1,
-    "department": "Sales & Marketing",
-    "region": "region_7",
-    "education": "Bachelor'"'"'s",
-    "gender": "Male",
-    "recruitment_channel": "sourcing",
-    "no_of_trainings": 1,
-    "age": 30,
-    "previous_year_rating": 4,
-    "length_of_service": 5,
-    "awards_won?": 0,
-    "avg_training_score": 78
-  }'
-```
-
-**Example response:**
-
-```json
-{
-  "status": "success",
-  "prediction": {
-    "probability": 0.42,
-    "strict_threshold": 0.7,
-    "is_promoted": false,
-    "action": "Keep under observation"
-  }
-}
-```
-
-An interactive version is available at `/docs` (Swagger UI) or the HTML demo at `/`.
 
 ## 9. Future Enhancements
 
