@@ -65,7 +65,7 @@ The dataset contains 54,808 samples and 13 features, encompassing past/current p
 
 Built with scikit-learn's `Pipeline` + `ColumnTransformer`, consisting of a custom feature engineering step followed by 7 separate column groups (drop, numeric, ordinal, one-hot, target encoding, constant imputation, passthrough).
 
-<img width="2720" height="1600" alt="preprocessing_pipeline" src="https://github.com/user-attachments/assets/4785306c-03b8-4e46-939a-21679b8ce0da" />
+<img width="1000" height="600" alt="preprocessing_pipeline" src="https://github.com/user-attachments/assets/4785306c-03b8-4e46-939a-21679b8ce0da" />
 
 ### 4.2. Why PR-AUC and Class-1 Precision/Recall
 
@@ -81,9 +81,6 @@ Formal benchmarking used two model groups with 5-fold cross-validation:
 
 **Ensemble** (bagging + boosting): Random Forest, Extra Trees, AdaBoost, XGBoost, LightGBM, CatBoost
 
-<img width="300" height="167" alt="ensemble results" src="https://github.com/user-attachments/assets/5951f2af-2e67-46be-9790-3b70f515f725" />
-<img width="300" height="164" alt="traditional results" src="https://github.com/user-attachments/assets/407c3db2-accd-43f3-bcdd-70e3f6dc63bd" />
-
 **Results:** the boosting models (LightGBM, CatBoost, XGBoost) led on PR-AUC, but only slightly ahead of SVM — not every ensemble model outperformed the traditional ones. Two clear tendencies emerged:
 
 - **Moderate recall (~55–65%), low precision (~20–30%)**: LightGBM, CatBoost, XGBoost, Logistic Regression.
@@ -94,10 +91,6 @@ We picked one model to represent each tendency for further tuning: **LightGBM** 
 ### 4.4. Fine-tuning & Final Model Selection
 
 Both models were tuned with **Optuna**. Performance improved slightly but not dramatically — most results plateaued around a PR-AUC of ~55%, suggesting the current bottleneck is feature engineering rather than hyperparameter tuning (a direction for future improvement).
-
-<img width="352" height="245" alt="tuning result 1" src="https://github.com/user-attachments/assets/c1b25da2-27e9-433a-b77f-b5928ccd984e" />
-<img width="350" height="259" alt="tuning result 2" src="https://github.com/user-attachments/assets/c2115ef2-1ac7-4618-8b16-8d3eede3f252" />
-<img width="385" height="311" alt="tuning result 3" src="https://github.com/user-attachments/assets/b50ebdc0-d1bb-4a53-a7bd-723c4de6102c" />
 
 That said, a soft-voting ensemble of LightGBM + AdaBoost, and AdaBoost alone, handle one scenario particularly well: picking a single candidate with **high confidence**.
 
