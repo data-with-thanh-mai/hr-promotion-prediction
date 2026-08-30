@@ -1,146 +1,229 @@
 # HR Promotion Prediction API
-## 1. Trải nghiệm Giao diện UI (Interactive API Demo)
+
+## 1. Interactive API Demo
+
+<!-- TODO: add a screenshot or short GIF of the HTML demo / Swagger UI here -->
+
 ## 2. Business Context & Proposed Solution
 
 **The Problem:**
-A large Multinational Corporation (MNC) has 9 broad verticals across the organization. One of their primary challenges is identifying the right people for promotion (for manager positions and below) and preparing them in time. 
+A large Multinational Corporation (MNC) has 9 broad verticals across the organization. One of their primary challenges is identifying the right people for promotion (for manager positions and below) and preparing them in time.
 
-Currently, final promotions are only announced after annual evaluations. This rigid schedule forces capable employees to wait months before transitioning into new roles, causing operational delays and wasting talent. 
+Currently, final promotions are only announced after annual evaluations. This rigid schedule forces capable employees to wait months before transitioning into new roles, causing operational delays and wasting talent.
 
 **The Solution:**
-To address this, this project delivers an end-to-end Machine Learning solution to evaluate and identify eligible candidates at specific checkpoints throughout the year. 
+To address this, this project delivers an end-to-end Machine Learning solution to evaluate and identify eligible candidates at specific checkpoints throughout the year.
 
 Specifically, we built a robust classification pipeline that handles highly imbalanced HR data. The final model is deployed as a real-time **REST API using FastAPI**. This allows the HR department to simply input an employee's current metrics (training score, length of service, etc.) and instantly receive a data-driven recommendation (*"Recommend for Promotion"* or *"Keep under observation"*), expediting the promotion cycle without waiting for the year-end review.
-Multiple attributes have been provided around Employee's past and current performance along with demographics.
+
+Multiple attributes have been provided around each employee's past and current performance along with demographics.
+
 ## 3. Data & Preprocessing Overview
+
 The dataset contains 54,808 samples and 13 features, encompassing past/current performance and demographics.
 
-Data Dictionary:
+**Data Dictionary:**
 
-employee_id: Unique ID for the employee
+| Field | Description |
+|---|---|
+| `employee_id` | Unique ID for the employee |
+| `department` | Department of the employee |
+| `region` | Region of employment (unordered) |
+| `education` | Education level |
+| `gender` | Gender of the employee |
+| `recruitment_channel` | Channel of recruitment |
+| `no_of_trainings` | Number of other trainings completed in the previous year |
+| `age` | Age of the employee |
+| `previous_year_rating` | Employee rating for the previous year |
+| `length_of_service` | Length of service in years |
+| `awards_won?` | 1 if awards won during the previous year, else 0 |
+| `avg_training_score` | Average score in current training evaluations |
+| `is_promoted` (target) | 1 if recommended for promotion, else 0 |
 
-department: Department of the employee
+**Data Cleaning & Preprocessing Strategy:**
 
-region: Region of employment (unordered)
+- **Imbalanced data handling:** class 1 (promoted) accounts for only ~8.69% of the dataset. Handled using class weights inside the model architecture. SMOTE was intentionally avoided, as generating synthetic data points for categorical variables introduces unrealistic noise.
+- **Missing value imputation:**
+  - `previous_year_rating` (~7.63% missing): imputed with 0 — business logic dictates that these missing values belong to newly hired employees who don't yet have a previous-year rating.
+  - `education` (~4.38% missing): imputed with the most-frequent strategy to avoid dropping rows.
 
-education: Education Level
+**Feature Selection & Bias Mitigation (AI Fairness):**
 
-gender: Gender of the Employee
+- Dropped `employee_id` (no predictive value).
+- Dropped `gender` and `age`. A chi-square test confirmed `gender` has no statistically significant association with `is_promoted` (p = 0.090). Removing these demographic features reduces noise and ensures the model bases promotion recommendations strictly on merit and performance, mitigating age and gender bias.
 
-recruitment_channel: Channel of recruitment
+  > Note: removing these raw features reduces but does not fully eliminate bias risk — proxy correlations through `region` or `department` were not tested in this iteration.
 
-no_of_trainings: Number of other trainings completed in the previous year
+  <img width="567" height="334" alt="chi-square test results" src="https://github.com/user-attachments/assets/36a7a717-3f24-47a4-bd49-c42f542d8261" />
 
-age: Age of the Employee
+- **Categorical encoding:** applied ordinal encoding for `education`, as higher education levels historically correlate with higher promotion readiness.
+- **Feature engineering:** created two new features:
+  - `relative_training_score`: ratio of the employee's score to the average score of their department.
+  - `total_training_score`: `avg_training_score * no_of_trainings`, capturing absolute training volume and quality.
 
-previous_year_rating: Employee Rating for the previous year
+## 4. Model Architecture & Threshold Strategy
 
-length_of_service: Length of service in years
+### 4.1. Preprocessing Pipeline
 
-awards_won?: 1 if awards won during the previous year, else 0
+Built with scikit-learn's `Pipeline` + `ColumnTransformer`, consisting of a custom feature engineering step followed by 7 separate column groups (drop, numeric, ordinal, one-hot, target encoding, constant imputation, passthrough).
 
-avg_training_score: Average score in current training evaluations
+<img width="2720" height="1600" alt="preprocessing_pipeline" src="https://github.com/user-attachments/assets/4785306c-03b8-4e46-939a-21679b8ce0da" />
 
-is_promoted: (Target) 1 if recommended for promotion, else 0
+### 4.2. Why PR-AUC and Class-1 Precision/Recall
 
-Data Cleaning & Preprocessing Strategy:
+The dataset is highly imbalanced (~8.7% promoted), so Accuracy and ROC-AUC are misleading — a model that always predicts "not promoted" still scores ~91% accuracy. We use **PR-AUC** and **Precision/Recall of class 1** instead, since false positives (wrongly recommending promotion) and false negatives (missing deserving talent) both carry real business cost that class-0 metrics would hide.
 
-Imbalanced Data Handling: Class 1 (Promoted) accounts for only ~8.69% of the dataset. Handled using Class Weights inside the model architecture. SMOTE was intentionally avoided because generating synthetic data points for categorical variables introduces unrealistic data noise.  
+### 4.3. Baseline Model Comparison
 
-Missing Value Imputation:  
+LazyPredict gave a quick first look, but wasn't suitable for deeper evaluation — it doesn't support custom cross-validation or imbalance handling, so it was used for reference only.
 
-previous_year_rating (~7.63% missing): Imputed with 0. Business logic dictates that these missing values belong to newly hired employees who do not have a performance rating from the previous year.  
+Formal benchmarking used two model groups with 5-fold cross-validation:
 
-education (~4.38% missing): Imputed with the most_frequent strategy to avoid dropping rows.
+**Traditional** (`class_weight='balanced'`): Logistic Regression, Decision Tree, Gaussian Naive Bayes, K-Neighbors, SVM
 
-Feature Selection & Bias Mitigation (AI Fairness):
+**Ensemble** (bagging + boosting): Random Forest, Extra Trees, AdaBoost, XGBoost, LightGBM, CatBoost
 
-Dropped employee_id (no predictive value).
+<img width="570" height="167" alt="ensemble results" src="https://github.com/user-attachments/assets/5951f2af-2e67-46be-9790-3b70f515f725" />
+<img width="573" height="164" alt="traditional results" src="https://github.com/user-attachments/assets/407c3db2-accd-43f3-bcdd-70e3f6dc63bd" />
 
-Dropped gender(hypothesis testing chi-squre5	gender	9.008336e-02	No)  :  and age : Removing these demographic features not only reduces noise but also ensures the model makes promotion recommendations based strictly on merit and performance, mitigating age and gender bias.
-<img width="567" height="334" alt="image" src="https://github.com/user-attachments/assets/36a7a717-3f24-47a4-bd49-c42f542d8261" />
+**Results:** the boosting models (LightGBM, CatBoost, XGBoost) led on PR-AUC, but only slightly ahead of SVM — not every ensemble model outperformed the traditional ones. Two clear tendencies emerged:
 
+- **Moderate recall (~55–65%), low precision (~20–30%)**: LightGBM, CatBoost, XGBoost, Logistic Regression.
+- **High precision (>85%), low recall (~30%)**: AdaBoost, K-Neighbors.
 
-Categorical Encoding: Applied Ordinal Encoding for education, as higher education levels historically correlate with higher promotion readiness.
+We picked one model to represent each tendency for further tuning: **LightGBM** (balanced precision-recall trade-off) and **AdaBoost** (conservative, favors certainty over coverage).
 
-Feature Engineering: Created two new impactful features:
+### 4.4. Fine-tuning & Final Model Selection
 
-relative_training_score: Ratio of the employee's score to the average score of their specific department.
+Both models were tuned with **Optuna**. Performance improved slightly but not dramatically — most results plateaued around a PR-AUC of ~55%, suggesting the current bottleneck is feature engineering rather than hyperparameter tuning (a direction for future improvement).
 
-total_training_score: Calculated as avg_training_score * no_of_trainings to capture the absolute training volume and quality.
-   
-## 4. Kiến trúc Mô hình & Ngưỡng quyết định (Model Architecture & Threshold Strategy)
-preprcessing pipeline 
-**Preprocessing:** Custom feature engineering step + ColumnTransformer 
-handling 7 column groups (drop, numeric, ordinal, one-hot, target encoding, 
-constant imputation, passthrough). See diagram below.
-<img width="2720" height="1600" alt="preprocessing_pipeline_column_transformer_blue" src="https://github.com/user-attachments/assets/4785306c-03b8-4e46-939a-21679b8ce0da" />
+<img width="352" height="245" alt="tuning result 1" src="https://github.com/user-attachments/assets/c1b25da2-27e9-433a-b77f-b5928ccd984e" />
+<img width="350" height="259" alt="tuning result 2" src="https://github.com/user-attachments/assets/c2115ef2-1ac7-4618-8b16-8d3eede3f252" />
+<img width="385" height="311" alt="tuning result 3" src="https://github.com/user-attachments/assets/b50ebdc0-d1bb-4a53-a7bd-723c4de6102c" />
 
+That said, a soft-voting ensemble of LightGBM + AdaBoost, and AdaBoost alone, handle one scenario particularly well: picking a single candidate with **high confidence**.
 
-ở phần này sử dụng model của scikitlenr 
-### Why PR-AUC and class-1 metrics (not Accuracy/ROC-AUC)
+Since HR prioritizes **precision** (a wrong promotion recommendation is costlier than a missed one at this checkpoint — unflagged candidates can still be reviewed at the next cycle), the ensemble weights and decision threshold are being re-tuned using the validation-set precision-recall curve to find a high-precision operating point that doesn't sacrifice recall unnecessarily.
 
-The dataset is highly imbalanced — only ~8.7% of employees are promoted 
-(`is_promoted = 1`). This makes common metrics misleading:
+> **Results pending final re-evaluation.** The final ensemble weights, threshold, and test-set performance table (Precision/Recall/F1/PR-AUC for the chosen operating point) will be added here once validated.
 
-**Accuracy is misleading.** A trivial model that always predicts "not 
-promoted" already scores ~91.3% accuracy — while being completely useless 
-for the actual business goal of finding promotion candidates. In our 
-benchmark, AdaBoost has the *highest* accuracy (0.94) but recalls only 
-32.6% of actual promotions — missing 2 out of every 3 employees who 
-deserved one.
+## 5. Repository Structure
 
-**ROC-AUC is overly optimistic.** It's computed from the true-negative 
-rate, and with 91% of the data being class 0, true negatives are abundant 
-— keeping the false-positive rate low almost by default. All models in 
-our benchmark score a comfortable 0.76–0.81 ROC-AUC, but their PR-AUC 
-(which ignores true negatives entirely) ranges only 0.22–0.55 — the real 
-spread in performance.
+```
+hr-promotion-prediction/
+├── app/                            # FastAPI application
+│   ├── static/                     # HTML demo frontend
+│   ├── feature_engineering.py      # Custom transformer class
+│   ├── hr_promotion_pipeline.pkl   # Trained model pipeline
+│   └── main.py                     # API entrypoint
+├── data/
+│   └── data.csv                    # Dataset
+├── notebook/
+│   └── hr-promotion-predict.ipynb  # Full EDA, training & tuning notebook
+├── .gitignore
+├── LICENSE
+├── README.md
+├── requirements.txt                # Runtime dependencies
+└── requirements-dev.txt            # Dev/notebook dependencies (Optuna, LazyPredict...)
+```
 
-**Why we track Precision/Recall for class 1 specifically:** the two 
-error types have very different business costs:
-- **False positive** (wrongly recommending promotion) → wasted training 
-  budget, a role given to the wrong person, erodes trust in the system.
-- **False negative** (missing a deserving employee) → a high performer 
-  goes unrecognized, risking attrition.
+## 6. Setup & Installation
 
-Reporting Precision/Recall for class 0 and class 1 together (as most 
-libraries do by default) hides this — class 0's numbers are always high 
-simply because it's the majority class. **PR-AUC and class-1 
-Precision/Recall are the metrics that actually reflect model quality 
-for this problem.**
-baseline model 
-dùng lazy predict thử 1 lượng các mô hình defaul -> nhưng mà thông số chủ yếu ở đây pr-auc cho thấy sự tương qun của precision và recall của class 1, và các chỉ số preciiosn-recall calls1 -> lazy predict ở ddaya ko có tác dụng lắm do imblance data
-thử 2 loại mô hình : 
-traditon :  models = {
-        "Logistic Regression": LogisticRegression(class_weight='balanced', max_iter=1000, random_state=random_state),
-        "Decision Tree": DecisionTreeClassifier(class_weight='balanced', random_state=random_state),
-        "Gaussian Naive Bayes": GaussianNB(),
-        "K-Neighbors": KNeighborsClassifier(),
-        "SVM": SVC(class_weight='balanced', probability=True, random_state=random_state)
-    }
-và embamel :(2 nhóm bagging và booging gì đó) 
-odels = {
-        "Random Forest": RandomForestClassifier(class_weight='balanced', random_state=random_state, n_jobs=-1),
-        "Extra Trees": ExtraTreesClassifier(class_weight='balanced', random_state=random_state, n_jobs=-1),
-        "AdaBoost": AdaBoostClassifier(random_state=random_state),
-        "XGBoost": XGBClassifier(scale_pos_weight=scale_weight, random_state=random_state, eval_metric='logloss', n_jobs=-1),
-        "LightGBM": LGBMClassifier(scale_pos_weight=scale_weight, random_state=random_state, verbose=-1, n_jobs=-1),
-        "CatBoost": CatBoostClassifier(auto_class_weights='Balanced', random_state=random_state, verbose=0)
-    }
-   <img width="570" height="167" alt="image" src="https://github.com/user-attachments/assets/5951f2af-2e67-46be-9790-3b70f515f725" />
-   <img width="573" height="164" alt="image" src="https://github.com/user-attachments/assets/407c3db2-accd-43f3-bcdd-70e3f6dc63bd" />
-Kết quả cho thấy : phần lớn các mô hình them nhóm emsble chỉ performance nhỉn hơn 1 chút. tuy nhiên đnag khá thấp, chênh lẹnh pr-auc ko nhiều
-có 2 xu hướng chính:
-- recall trung bìnb ( cơ 60&) và precions cỡ 30%
-- preciosn cao (hơn 90*) và recall tháp 30&
-Mình chọn 2 mô hình đại điẹn cho 2 nhóm xu hứng này : lightxgb ( hơi ba phải) và adaboost ( có xu hướng phạt nặng dự đoán sai)
+**Requirements:** Python >= 3.10
 
-fitune bằng optuna 
-## 5. Cấu trúc Thư mục Dự án (Repository Structure
+```bash
+# Clone the repository
+git clone https://github.com/<your-username>/hr-promotion-prediction.git
+cd hr-promotion-prediction
 
-## 6. Yêu cầu Hệ thống & Cài đặt (Setup & Installation)
+# Create and activate a virtual environment
+python -m venv venv
 
-## 7. Hướng dẫn Khởi chạy Server (Running the API)
-## 8. Hướng dẫn Tương tác API (API Usage & Examples)
-## 9. Lộ trình Phát triển Tiếp theo (Future Enhancements)
+# Windows
+venv\Scripts\activate
+
+# macOS/Linux
+source venv/bin/activate
+
+# Install runtime dependencies (required to run the API)
+pip install -r requirements.txt
+```
+
+> If you want to reproduce the notebook (EDA, model training, hyperparameter tuning with Optuna, LazyPredict benchmarking), also install:
+> ```bash
+> pip install -r requirements-dev.txt
+> ```
+
+## 7. Running the API
+
+The FastAPI app lives inside `app/`, so run uvicorn from the project root using the `app.main:app` path:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Once the server starts, it will be available at:
+
+- **Interactive HTML demo:** http://127.0.0.1:8000/
+- **Swagger UI (API docs & testing):** http://127.0.0.1:8000/docs
+
+Both let you submit employee data and get a promotion recommendation with its predicted probability.
+
+## 8. API Usage & Examples
+
+**Endpoint:** `POST /predict`
+
+**Example request (curl):**
+
+```bash
+curl -X POST http://127.0.0.1:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "employee_id": 1,
+    "department": "Sales & Marketing",
+    "region": "region_7",
+    "education": "Bachelor'"'"'s",
+    "gender": "Male",
+    "recruitment_channel": "sourcing",
+    "no_of_trainings": 1,
+    "age": 30,
+    "previous_year_rating": 4,
+    "length_of_service": 5,
+    "awards_won?": 0,
+    "avg_training_score": 78
+  }'
+```
+
+**Example response:**
+
+```json
+{
+  "status": "success",
+  "prediction": {
+    "probability": 0.42,
+    "strict_threshold": 0.7,
+    "is_promoted": false,
+    "action": "Keep under observation"
+  }
+}
+```
+
+An interactive version is available at `/docs` (Swagger UI) or the HTML demo at `/`.
+
+## 9. Future Enhancements
+
+**Model Performance:**
+- Explore additional feature engineering — current models plateau around PR-AUC ~55%, suggesting the bottleneck is feature richness rather than hyperparameter tuning. Potential directions: interaction features between department and training metrics, tenure-based trends, peer-relative performance scores.
+- Experiment with SMOTE variants (e.g. SMOTENC for mixed categorical/numeric data) as an alternative to class-weight balancing.
+- Add model explainability (SHAP values) so HR can see *why* a specific employee was or wasn't recommended — important for a decision that affects real people.
+
+**Engineering & Deployment:**
+- Containerize the app with Docker for consistent deployment across environments (avoids the Python/dependency version issues encountered during local setup).
+- Add a `/batch-predict` endpoint to score multiple employees at once via CSV upload.
+- Add request logging and basic monitoring (e.g. track prediction distribution over time to catch data/model drift).
+- Add automated tests (unit tests for the preprocessing pipeline, integration tests for the API endpoints) and a CI pipeline.
+
+**Product:**
+- Add authentication to the API before any production use, since it handles employee performance data.
+- Build a lightweight internal dashboard (e.g. Streamlit) for HR to review predictions in bulk, rather than one employee at a time via the API form.
+- Add a feedback loop: track actual promotion outcomes vs. predictions to periodically retrain and validate the model.
