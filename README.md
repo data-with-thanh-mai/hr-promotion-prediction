@@ -3,7 +3,7 @@
 
 ## 1. Interactive API Demo
 
-![Uploading demo-ezgif.com-video-to-gif-converter.gif…]()
+<img width="1284" height="720" alt="demo-ezgif com-video-to-gif-converter" src="https://github.com/user-attachments/assets/be3e4e60-90b4-48d1-8659-967a1d1d9c13" />
 
 
 ## 2. Business Context & Proposed Solution
