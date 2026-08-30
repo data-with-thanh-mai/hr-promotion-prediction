@@ -65,7 +65,7 @@ The dataset contains 54,808 samples and 13 features, encompassing past/current p
 
 Built with scikit-learn's `Pipeline` + `ColumnTransformer`, consisting of a custom feature engineering step followed by 7 separate column groups (drop, numeric, ordinal, one-hot, target encoding, constant imputation, passthrough).
 
-<img width="1000" height="600" alt="preprocessing_pipeline" src="https://github.com/user-attachments/assets/4785306c-03b8-4e46-939a-21679b8ce0da" />
+<img width="600" height="300" alt="preprocessing_pipeline" src="https://github.com/user-attachments/assets/4785306c-03b8-4e46-939a-21679b8ce0da" />
 
 ### 4.2. Why PR-AUC and Class-1 Precision/Recall
 
